@@ -1,6 +1,6 @@
 package org.beecrypt
 
-import sun.security.util.Password
+import java.lang.RuntimeException
 
 /**
  * (c) 2011 ...
@@ -38,31 +38,40 @@ trait BeeCrypt {
   type PasswordHash = String
 
   /**
-   * For Scala-bility
+   * Useful salting default
    */
-  type SaltGenerator = () => Salt
-  type SecureRandomProvider = () => SecureRandom
+  val QuickAndWeak = 6
+  val GoodEnough = 10
+  val RatherTough = 14
+  val PrettyInsane = 18
 
   /**
-   * Userful defaults
+   * For Scala-bility
    */
+  type SaltGenerator = (Int) => Salt
   private val random: SecureRandom = new SecureRandom
-  private val defaultSaltingRounds: Int = 10
-
-  private val defaultSecureRandomProvider = () => random
-  private val defaultSaltGenerator = () => generateSalt()
+  private val defaultSaltGenerator: SaltGenerator = (rounds: Int) => BCrypt.gensalt(rounds, random)
 
   /**
    * And for the actual API
+   *
+   * @params rounds - this is the base of log2 of the number of salting rounds. Legal values are >=4, sane values are <=20
    */
-  def generateSalt(rounds: Int = defaultSaltingRounds,
-                   secureRandomProvider: SecureRandomProvider = defaultSecureRandomProvider): Salt = BCrypt.gensalt(rounds, secureRandomProvider())
+  private val roundsError = "As the number of operations grows with 2^rounds, legal/sane values of rounds are in fixed in (4..20). Smaller is less secure, larger is significantly slower"
 
   def hashPassword(password: PlainPassword,
-                   saltGenerator: SaltGenerator = defaultSaltGenerator): PasswordHash = BCrypt.hashpw(password, saltGenerator())
+                   rounds: Int = goodEnough,
+                   saltGenerator: SaltGenerator = defaultSaltGenerator): PasswordHash = {
+
+    def roundCountLegal(rounds: Int) = rounds >= 4 && rounds <= 20
+
+    if (!roundCountLegal(rounds)) throw new RuntimeException(roundsError)
+
+    BCrypt.hashpw(password, saltGenerator(rounds))
+  }
 
   def matches(plainTextPassword: PlainPassword,
-              hashedPassword: PasswordHash): Boolean = hashedPassword.compareTo(hashPassword(plainTextPassword, () => hashedPassword)) == 0
+              hashedPassword: PasswordHash): Boolean = hashedPassword.compareTo(BCrypt.hashpw(plainTextPassword, hashedPassword)) == 0
 }
 
 object BeeCrypt extends BeeCrypt
