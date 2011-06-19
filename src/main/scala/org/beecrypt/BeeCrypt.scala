@@ -1,7 +1,5 @@
 package org.beecrypt
 
-import java.lang.RuntimeException
-
 /**
  * (c) 2011 ...
  *
@@ -48,8 +46,8 @@ trait BeeCrypt {
   /**
    * For Scala-bility
    */
-  type SaltGenerator = (Int) => Salt
   private val random: SecureRandom = new SecureRandom
+  type SaltGenerator = (Int) => Salt
   private val defaultSaltGenerator: SaltGenerator = (rounds: Int) => BCrypt.gensalt(rounds, random)
 
   /**
@@ -57,21 +55,27 @@ trait BeeCrypt {
    *
    * @params rounds - this is the base of log2 of the number of salting rounds. Legal values are >=4, sane values are <=20
    */
-  private val roundsError = "As the number of operations grows with 2^rounds, legal/sane values of rounds are in fixed in (4..20). Smaller is less secure, larger is significantly slower"
-
   def hashPassword(password: PlainPassword,
-                   rounds: Int = goodEnough,
+                   rounds: Int = GoodEnough,
                    saltGenerator: SaltGenerator = defaultSaltGenerator): PasswordHash = {
 
-    def roundCountLegal(rounds: Int) = rounds >= 4 && rounds <= 20
+    import java.lang.RuntimeException
 
+    val roundsError =
+      "As the number of operations grows with 2^rounds, legal/sane values of rounds are in fixed in (4..20). " +
+        "Smaller is less secure, larger is significantly slower"
+
+    def roundCountLegal(rounds: Int) = rounds >= 4 && rounds <= 20
     if (!roundCountLegal(rounds)) throw new RuntimeException(roundsError)
 
     BCrypt.hashpw(password, saltGenerator(rounds))
   }
 
-  def matches(plainTextPassword: PlainPassword,
-              hashedPassword: PasswordHash): Boolean = hashedPassword.compareTo(BCrypt.hashpw(plainTextPassword, hashedPassword)) == 0
+  /**
+   * Sort of self-explanatory :)
+   */
+  def matches(plainTextPassword: PlainPassword, hashedPassword: PasswordHash): Boolean =
+    hashedPassword.compareTo(BCrypt.hashpw(plainTextPassword, hashedPassword)) == 0
 }
 
 object BeeCrypt extends BeeCrypt
